@@ -1,0 +1,12 @@
+datas/
+*.env
+
+# 编译输出
+target/
+*.class
+
+# IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
