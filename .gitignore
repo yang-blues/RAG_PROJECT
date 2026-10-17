@@ -1,5 +1,6 @@
 datas/
 *.env
+.env
 
 # 编译输出
 target/
