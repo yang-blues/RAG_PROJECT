@@ -1,13 +1,115 @@
-datas/
-*.env
+# =========================================================
+#  环境变量 / 密钥（务必不要提交）
+# =========================================================
 .env
+.env.*
+*.env
+!.env.example
+*.pem
+*.key
+secrets.yaml
+credentials.json
 
-# 编译输出
-target/
-*.class
+# =========================================================
+#  Python
+# =========================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.pyd
 
-# IDEA
+# 虚拟环境
+venv/
+.venv/
+env/
+ENV/
+.venv.bak/
+python_env/
+
+# 打包 / 构建产物
+build/
+dist/
+develop-eggs/
+downloads/
+eggs/
+.eggs/
+sdist/
+wheels/
+*.egg-info/
+*.egg
+.installed.cfg
+MANIFEST
+
+# 测试 / 覆盖率
+.pytest_cache/
+.cache
+.tox/
+.nox/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+nosetests.xml
+
+# 静态检查 / 类型检查
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.ruff_cache/
+.pyre/
+.pytype/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# =========================================================
+#  项目数据 / 日志 / 向量库
+# =========================================================
+datas/
+data/
+outputs/
+logs/
+*.log
+*.db
+*.sqlite
+*.sqlite3
+
+# 向量数据库本地数据
+chroma/
+chroma_db/
+milvus_data/
+milvus.db
+volumes/
+
+# 模型权重文件（体积大，走模型仓库或对象存储）
+models/
+*.bin
+*.safetensors
+*.gguf
+*.onnx
+*.pt
+*.pth
+*.ckpt
+
+# =========================================================
+#  IDE / 编辑器
+# =========================================================
 .idea/
 *.iml
 *.iws
 *.ipr
+.vscode/
+*.swp
+*.swo
+*~
+
+# =========================================================
+#  操作系统
+# =========================================================
+.DS_Store
+Thumbs.db
+desktop.ini
+ehthumbs.db
+/.workbuddy/
