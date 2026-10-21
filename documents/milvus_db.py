@@ -38,7 +38,7 @@ class MilvusVectorSave:
         ]
         self.vector_store_saved = None
 
-    def create_collection(self,is_first=True):
+    def connection(self, is_first=False):
         """创建一个collection"""
         if is_first:
             client = MilvusClient(uri=MILVUS_URI)
@@ -52,7 +52,11 @@ class MilvusVectorSave:
         self.vector_store_saved = Milvus(
              embedding_function=qwen_embedding,
             collection_name=COLLECTION_NAME,
-            builtin_function=BM25BuiltInFunction(),
+            builtin_function=BM25BuiltInFunction(
+                input_field_names="text",
+                output_field_names="sparse",
+                analyzer_params={"type": "chinese"},
+            ),
             vector_field=['dense','sparse'],
             index_params=self.index_params,
             consistency_level="Strong",#读写一致性，Strong,Session(默认),Bounded,Eventually
@@ -69,7 +73,7 @@ if __name__ == '__main__':
     docs = parser.parse_markdown_to_documents(file_path)
 
     mv = MilvusVectorSave()
-    mv.create_collection(is_first=True)
+    mv.connection(is_first=True)
     mv.add_documents(docs)
 
     client = mv.vector_store_saved.client
