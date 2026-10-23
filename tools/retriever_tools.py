@@ -14,7 +14,7 @@ retriever = mv.vector_store_saved.as_retriever(
         'filter': {"category": "content"}
     }
 )
-
+#可以作为工具直接ToolNode,也可以直接invock
 retriever_tool = create_retriever_tool(
     retriever=retriever,
     name='rag_retriever',
