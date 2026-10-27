@@ -1,4 +1,4 @@
-from graph2.grader_chain import retrieval_grader_chain
+from test.graph2.grader_chain import retrieval_grader_chain
 from untils.log_utils import log
 
 

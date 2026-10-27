@@ -1,6 +1,6 @@
 from langchain_core.documents import Document
 
-from search_tool.web_search_tool import web_search_tool
+from tools.web_search_tool import web_search_tool
 from untils.log_utils import log
 
 

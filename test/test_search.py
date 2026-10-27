@@ -78,7 +78,7 @@ def test3():
         connection_args = {"uri": MILVUS_URI}
     )
 
-    file_path = r"D:\ipython\RAG_PROJECT\datas\md\tech_report_0tfhhamx.md"
+    file_path = r"/datas/md/tech_report_0tfhhamx.md"
     parser = MarkdownParser()
     docs = parser.parse_markdown_to_documents(file_path)
 

@@ -3,7 +3,7 @@ from typing import Literal
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import BaseModel, Field
 
-from graph2.graph_state2 import GraphState
+from rag_graph.rag_state import GraphState
 from llm_model.all_llm import llm
 from untils.log_utils import log
 
