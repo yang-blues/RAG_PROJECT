@@ -21,7 +21,7 @@ def create_entry_node(assistant_name:str,new_dialog_state:str) -> Callable:
         :param state:当前状态，包含所有信息
         :return: 含新消息和状态字典
         """
-        tool_call_id = state["message"][-1].tool_calls[0]["id"]
+        tool_call_id = state["messages"][-1].tool_calls[0]["id"]
         return {
             "messages":[
                 ToolMessage(

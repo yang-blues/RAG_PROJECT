@@ -44,6 +44,7 @@ def route_query(state: GraphState):
     question = state["question"]
     res = question_route_chain.invoke({"question":question})
     log.info(f"路由结果:{res.datasource}")
+    return res.datasource
 
 #检索
 def retrieve(state: GraphState):

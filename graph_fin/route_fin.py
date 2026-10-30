@@ -14,7 +14,7 @@ def route_primary_assistant(state:State):
     route = tools_condition(state)#如果有工具调用返回返回tools否则返回END
     if route == END:
         return END
-    tool_calls = state["message"][-1].tools_calls
+    tool_calls = state["messages"][-1].tool_calls
     if not tool_calls:
         return END
     name = tool_calls[0]["name"]
