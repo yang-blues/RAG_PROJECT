@@ -2,7 +2,7 @@ from langchain_core.messages import HumanMessage
 
 
 from llm_model.all_llm import llm
-from tools.get_last_humanmessage import get_lat_human_message
+from test.get_last_humanmessage import get_lat_human_message
 from untils.log_utils import log
 
 

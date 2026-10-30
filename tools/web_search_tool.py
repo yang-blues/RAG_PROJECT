@@ -1,4 +1,2 @@
 from langchain_community.tools import TavilySearchResults
-
-
 web_search_tool = TavilySearchResults(max_retries=1)
