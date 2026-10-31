@@ -249,9 +249,7 @@ def route_after_compliance(state: dict) -> Literal["trade_sensitive_tools", "tra
 
 def build_approval_card(state: dict, thread_id: str = "") -> dict:
     """给前端的审批卡片：人核对的是**依据**，不是盲批动作。
-
-    票据按 thread_id 从库里现查（取该会话唯一那张 issued 票），而不是读 State 快照——
-    State 里压根没有票据字段，快照会保留上一次操作的残留值，人就会批错金额。
+    票据按 thread_id 从库里现查（取该会话唯一那张 issued 票）
     """
     ticket = get_pending_ticket(thread_id) or {}
     return {

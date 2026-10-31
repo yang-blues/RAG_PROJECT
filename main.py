@@ -1,16 +1,36 @@
-# 这是一个示例 Python 脚本。
+from contextlib import asynccontextmanager
 
-# 按 Shift+F10 执行或将其替换为您的代码。
-# 按 双击 Shift 在所有地方搜索类、文件、工具窗口、操作和设置。
+from fastapi import FastAPI
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
+from api.routes import router
+from untils.env_utils import POSTGRES_URI
+from untils.log_utils import log
 
-def print_hi(name):
-    # 在下面的代码行中使用断点来调试脚本。
-    print(f'Hi, {name}')  # 按 Ctrl+F8 切换断点。
+#异步上下文装饰器
+@asynccontextmanager
+async def lifespan(app:FastAPI):
+    #1.创建postgreSQL的异步连接
+    async with AsyncPostgresSaver.from_conn_string(POSTGRES_URI) as checkpointer:
 
+        #2.初始化Checkpointer所需的数据表
+        # await checkpoint.setup()
+        #3.延迟导入，构建并编译Langgraph
+        from graph_fin.graph_build import build_graph
 
-# 按装订区域中的绿色按钮以运行脚本。
-if __name__ == '__main__':
-    print_hi('PyCharm')
+        builder = build_graph()
+        graph = builder.compile(checkpointer=checkpointer)
 
-# 访问 https://www.jetbrains.com/help/pycharm/ 获取 PyCharm 帮助
+        #4.将编译后的图保存到FastAPI应用状态中
+        app.state.graph = graph
+        log.info("Langgraph初始化成功")
+
+        yield
+
+    log.info("Langgraph资源已释放")
+app = FastAPI(lifespan=lifespan)
+
+app.include_router(router)
+@app.get("/")
+async def root():
+    return {"message": "FastAPI 服务运行成功"}

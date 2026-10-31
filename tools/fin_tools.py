@@ -143,10 +143,13 @@ def place_order(product_code: str,
                 config: RunnableConfig = None) -> str:
     """下单（买入/卖出）。这是会产生真实副作用的写操作，执行前必须先通过合规核查。
 
+    **调用前提**：已与用户确认标的、方向、金额三要素。amount 必填，不得留空、
+    不得猜一个"合理"的数——用户没说金额就先向用户追问，问清楚再调本工具。
+
     参数说明：
         product_code: 产品代码，如 110020。
         action: buy 买入 / sell 卖出。
-        amount: 金额，支持 '50000' 或 '5万'。
+        amount: 金额，支持 '50000' 或 '5万'，必填。
         client_order_id: 客户端生成的幂等键，同一笔交易重试时必须传同一个值，
                          否则会被当作新订单。没有它就别调用本工具。
     """
@@ -264,8 +267,12 @@ def rebalance(targets: str,
 
 
 # ------------------------------------------------------------------ 工具分组
+# 行情助理：四件套齐全，查行情是它的本职
 MARKET_SAFE_TOOLS = [search_quotes, get_product_info, get_my_positions, get_my_orders]
-# 交易助理：只读工具全给它。下单前它要自己核对产品要素、可用资金、已有订单，
-# 让模型"先查再写"，而不是拿对话里的旧数字或猜的值去填下单参数。
-TRADE_SAFE_TOOLS = MARKET_SAFE_TOOLS
+# 交易助理：只保留"下单前自查"用的三件——产品要素、可用资金、历史订单，
+# 让模型先查再写，而不是拿对话里的旧数字或猜的值去填下单参数。
+# **刻意不含 search_quotes**：一旦给了行情工具，"用户问行情 → 交还主助理"这条
+# 规则就永远触发不了——模型会自己查完了事，星形路由和 dialog_state 都成了摆设。
+# 不给，才是让"超出能力"变成可判定事实的唯一可靠办法（靠 prompt 叮嘱不算）。
+TRADE_SAFE_TOOLS = [get_product_info, get_my_positions, get_my_orders]
 TRADE_SENSITIVE_TOOLS = [place_order, cancel_order, rebalance]

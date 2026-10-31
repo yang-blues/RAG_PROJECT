@@ -43,6 +43,5 @@ class State(TypedDict):
     compliance_decision: str
     compliance_evidence: str
     compliance_warnings: list
-    compliance_ticket: dict
 
 
