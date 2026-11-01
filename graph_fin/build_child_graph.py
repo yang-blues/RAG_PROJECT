@@ -5,6 +5,7 @@
 """
 from langchain_core.messages import ToolMessage
 from langgraph.graph import StateGraph,END
+from langgraph.types import interrupt, Command
 
 from graph_fin.agent_assistant import research_runnable, market_runnable, trade_runnable, trade_safe_tools, \
     trade_sensitive_tools
@@ -60,10 +61,32 @@ def build_market_graph(builder: StateGraph) -> StateGraph:
                                   ["market_tools", "leave_skill", END])
     return builder
 # ------------------------------------------------------------------ 交易子图
+#人工介入
+def approval_node(state:dict):
+    #1.暂停执行，等待外部传入审批结果
+    decision = interrupt({})
+    #2.用户同意，执行交易工具
+    if decision == "yes":
+        return Command(goto="trade_sensitive_tools")
+    #3.用户拒绝，找到原始工具调用
+    last_message = state["messages"][-1]
+    tool_calls = last_message.tool_calls
+    tool_messages = []
+    for tool_call in tool_calls:
+        tool_messages.append(
+            ToolMessage(
+                content="用户拒绝了本次交易请求，交易未执行。",
+                tool_call_id=tool_call["id"]
+            )
+        )
+    return Command(goto="trade",
+                   update={"messages": tool_messages})
+
 def build_trade_graph(builder: StateGraph) -> StateGraph:
     """交易助理子图：写操作前由条件边**强制插入**合规核查节点"""
     builder.add_node("enter_trade",create_entry_node("交易助理","trade"))
     builder.add_node("trade",FinAssistant(trade_runnable))
+    builder.add_node("approval_node",approval_node)
     builder.add_edge("enter_trade", "trade")
     builder.add_node(
         "trade_safe_tools",
@@ -81,7 +104,7 @@ def build_trade_graph(builder: StateGraph) -> StateGraph:
     # 合规三分支：只有 pass 进审批流，block / insufficient_evidence 直接打回助理
     builder.add_conditional_edges(
         "compliance_check", route_after_compliance,
-        {"trade_sensitive_tools": "trade_sensitive_tools",
+        {"approval_node": "approval_node",
          "trade": "trade"})
     return builder
 

@@ -143,6 +143,23 @@ def evaluate_rules(user_id: str, intent: dict):
                     f"{product['risk_level']}），限额与资金校验通过。",
             True, warnings)
 
+def clean_source(src) -> str:
+    """把文档来源裁成纯文件名，去掉目录与扩展名。
+
+    向量库里 metadata["source"] 存的是**入库时的绝对路径**
+    （如 D:/Work/.../datas/md_law\\私募投资基金监督管理条例.md）。
+    这个路径会一路进到审批卡片和票据的 evidence 文本，既暴露服务器目录结构，
+    对审批人也没有任何信息量。审批人需要的只是"依据哪部法规"，
+    所以在这里统一裁成"私募投资基金监督管理条例"。
+
+    注意：这是**入库脏数据**的兜底，不是根治。根治要在建立索引时
+    把 source 写成相对路径；但存量 metadata 改不了，只能重建索引。
+    """
+    if not src:
+        return "法规库"
+    name = str(src).replace("\\", "/").rstrip("/").rsplit("/", 1)[-1]
+    return name.rsplit(".", 1)[0] if "." in name else name
+
 def retrieve_evidence(query: str, topk=3):
     """从合规库取证据原文。返回 [(来源, 条文片段), ...]。
 
@@ -156,7 +173,7 @@ def retrieve_evidence(query: str, topk=3):
         return []
     out = []
     for d in docs:
-        src = d.metadata.get("source") or d.metadata.get("doc_no") or "法规库"
+        src = clean_source(d.metadata.get("source") or d.metadata.get("doc_no"))
         out.append((src, d.page_content[:220]))
     return out
 
@@ -236,14 +253,14 @@ def compliance_node(state:dict,config: RunnableConfig) -> dict:
             )
         ],
     }
-def route_after_compliance(state: dict) -> Literal["trade_sensitive_tools", "trade"]:
+def route_after_compliance(state: dict) -> Literal["approval_node", "trade"]:
     """合规之后的三分支路由：只有 pass 才能进审批流。
 
     block 与 insufficient_evidence 都直接打回交易助理，**根本不进审批流**——
     给一个不该做的操作弹审批卡片，等于把合规责任转嫁给用户。
     """
     if state.get("compliance_decision") == "pass":
-        return "trade_sensitive_tools"
+        return "approval_node"
     return "trade"
 
 
