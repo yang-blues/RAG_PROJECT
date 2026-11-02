@@ -41,6 +41,7 @@ def build_research_graph(builder: StateGraph) -> StateGraph:
                      create_entry_node("投研助理","research"))
     builder.add_node("research",FinAssistant(research_runnable))
     builder.add_node("research_tools",create_tool_node_with_fallback(RESEARCH_SAFE_TOOLS))
+    builder.add_edge("enter_research", "research")
     builder.add_edge("research_tools", "research")
     builder.add_conditional_edges("research", route_research,
                                   ["research_tools", "leave_skill", END])

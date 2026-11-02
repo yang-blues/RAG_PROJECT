@@ -37,7 +37,7 @@ async def chat(data:ChatRequest,request:Request):
             stream_mode="messages"
         ):
             #只处理模型生成的文本
-            if message.content:
+            if message.content or getattr(message, "tool_calls", None):
                 event_data = {
                     "content": message.content,
                     "node": metadata.get("langgraph_node"),
@@ -118,7 +118,7 @@ async def approval(data:ApprovalRequest,request:Request):
                 stream_mode="messages"
         ):
 
-            if message.content:
+            if message.content or getattr(message, "tool_calls", None):
                 event_data = {
                     "content": message.content,
                     "node": metadata.get("langgraph_node"),
