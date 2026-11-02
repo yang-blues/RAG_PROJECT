@@ -241,33 +241,6 @@ FINAGENT_DB_URL=postgresql+psycopg2://postgres:your_password@127.0.0.1:5432/fina
 
 
 
-### 5. 构建向量库
-
-把语料放到 `datas/md/`（投研）与 `datas/md_law/`（法规），然后：
-
-```bash
-python -m documents.write_milvus
-```
-
-解析进程负责 Markdown → 按标题层级合并 → 超长块语义切割，写进程消费队列并批量写入；embedding 接口偶发 400/限流时按指数退避重试 3 次，最终失败会统计并报错，不静默丢数据。
-
-> 管线本身与库无关：源目录和集合名配在 `documents/write_milvus.py` 的 `__main__` 里（默认 `datas/md` → `t_collection01`，且**每次运行会删集合重建**）。投研库与合规库各指一次目录、各跑一次即可，检索参数在 `search/retriever_config.py` 里按集合名对齐。
-
-> 另一个容易踩的点：百炼 embedding 接口有双重上限（单批条数约 20~40、整批 token 约 2 万）。`llm_model/embedings_model.py` 里必须同时设 `check_embedding_ctx_length=False`（否则 langchain 会传 token id 数组，接口 400）和 `chunk_size`（默认 1000 必然 400）。
-
-
-
-
-
----
-
-## 已知限制
-
-- **行情是确定性模拟值**（`zlib.crc32` 生成，同一代码每次同价），便于回归测试；接真实行情只需替换 `search_quotes` 内部实现，工具签名不变。
-- **SSE 没有心跳**：一轮约 30s 无字节下发，局域网无碍，公网部署前建议每 15s 发一行注释帧 `: ping`。
-- **`message` 事件包含节点内部输出**：子助理入场指令、工具返回的 JSON 都会下发，前端需要按 `node` / `message_type` 过滤，否则会看到不该给用户看的内容。
-- **拒绝审批时不吊销票据**：票据会在库里空置到 TTL（300s）自然过期，尚未补 `revoke_ticket` 与 `cancelled` 审计记录。
-- **向量库 `metadata["source"]` 存的是入库时的绝对路径**：`clean_source()` 在展示层裁剪，根治需要重建索引时改存相对路径。
 
 ## Roadmap
 
