@@ -200,45 +200,6 @@ query → dense(HNSW/IP, top60) ┐
 
 ---
 
-## 目录结构
-
-```
-.
-├── main.py                     FastAPI 入口：lifespan 里建 checkpointer、编译图
-├── api/
-│   ├── routes.py               POST /chat（SSE）与 POST /approval（恢复）
-│   ├── user_chat_dto.py
-│   └── user_approval_dto.py
-├── graph_fin/
-│   ├── graph_build.py          主图组装
-│   ├── build_child_graph.py    三个子图 + approval_node + leave_skill
-│   ├── agent_assistant.py      四个 prompt 与工具绑定、交接纪律
-│   ├── route_fin.py            全部条件边（含最关键的交易路由）
-│   ├── compliance.py           规则引擎 / 取证 / 审批卡片
-│   ├── ticket.py               票据签发、原子核销、吊销
-│   ├── state.py                State 定义 + dialog_state 栈 reducer
-│   ├── entry_node.py           子助理入场节点（写栈 + 注入上下文）
-│   ├── base_data_model.py      委派 / 交还的结构化输出模型
-│   └── get_user_profile_node.py
-├── rag_graph/                  自适应 RAG 子图（路由/检索/评级/改写/联网/生成）
-├── search/
-│   ├── hybrid_retriever.py     dense + BM25 + 加权 RRF + MMR
-│   ├── rank_ops.py             融合与重排算法
-│   └── retriever_config.py     两套检索预设
-├── documents/                  Markdown 解析、语义切片、多进程写 Milvus
-├── tools/
-│   ├── fin_tools.py            只读 / 写 两级金融工具
-│   ├── fin_db.py               业务库访问、建表、种子数据
-│   ├── init_fin_db.py          初始化脚本（支持 --create-db / --force / --export-sql）
-│   └── tools_handler.py        带 fallback 的 ToolNode
-├── llm_model/                  LLM 与 embedding 客户端
-├── untils/                     环境变量、日志、数据库配置（项目内历史拼写，保持原样）
-└── test/                       工作流 / 接口 / 检索验证脚本
-```
-
-`datas/`、`logs/` 体积大且含语料，未纳入版本控制。
-
----
 
 ## 快速开始
 
@@ -278,24 +239,7 @@ FINAGENT_DB_URL=postgresql+psycopg2://postgres:your_password@127.0.0.1:5432/fina
 
 两个连接串格式不同（一个给 psycopg 直连，一个给 SQLAlchemy 解析），指向同一个库。
 
-### 4. 初始化业务库
 
-```bash
-python tools/init_fin_db.py --create-db     # 库不存在时先建库，再建表 + 灌种子数据
-python tools/init_fin_db.py --force         # 清空业务表重建
-python tools/init_fin_db.py --export-sql    # 只导出建表 SQL 到 datas/sql/
-```
-
-种子账户（用户名 / 风险等级 / 初始资金）：
-
-| user_id | 姓名 | 等级 | 可投上限 | 单日限额 |
-|---|---|---|---|---|
-| `u_1001` | 张稳健 | C3 | R2 | 10 万 |
-| `u_1002` | 李成长 | C4 | R3 | 30 万 |
-| `u_1003` | 王激进 | C5 | R5 | 100 万 |
-| `u_1004` | 赵保守 | C1 | R1 | 1 万 |
-
-在售产品含 `000198`(R1) / `110020`(R3) / `510300`(R3) / `161725`(R4) / `519674`(R4) / `000001`(R5)。
 
 ### 5. 构建向量库
 
@@ -311,102 +255,9 @@ python -m documents.write_milvus
 
 > 另一个容易踩的点：百炼 embedding 接口有双重上限（单批条数约 20~40、整批 token 约 2 万）。`llm_model/embedings_model.py` 里必须同时设 `check_embedding_ctx_length=False`（否则 langchain 会传 token id 数组，接口 400）和 `chunk_size`（默认 1000 必然 400）。
 
-### 6. 启动
 
-```bash
-uvicorn main:app --host 127.0.0.1 --port 8000
-```
 
-Windows 上直接用 `uvicorn` 会踩一个坑：`uvicorn` 在 win32 上硬编码 `ProactorEventLoop`，而 psycopg3 的异步连接要求 `SelectorEventLoop`，表现为启动即退出。`test/run_server.py` 提供了绕过写法（`asyncio.Runner(loop_factory=SelectorEventLoop)`）：
 
-```bash
-python -m test.run_server     # 127.0.0.1:8123
-```
-
-下面的接口示例都按这个端口写。
-
----
-
-## 接口
-
-### `POST /chat`
-
-```json
-{ "message": "帮我买入 110020 一千元", "thread_id": "demo-001", "user_id": "u_1002" }
-```
-
-返回 `text/event-stream`，三种事件：
-
-| 事件 | data | 含义 |
-|---|---|---|
-| 默认（`message`） | `{content, node, message_type, id, tool_calls}` | 模型 / 工具的增量输出，`node` 是产出它的节点 |
-| `approval` | `{action, product_code, amount, evidence, warnings, ticket_id, expires_at}` | 图已挂起，等待人工审批 |
-| `done` | `{}` | 本轮正常结束 |
-
-```
-data:{"content":"我先核对一下您的账户…","node":"market","message_type":"AIMessageChunk","id":"lc_run-...","tool_calls":[]}
-
-event:approval
-data:{"action":"place_order","product_code":"110020","amount":1000.0,"evidence":["[私募投资基金监督管理条例] …"],"warnings":[],"ticket_id":"38e4a14d…","expires_at":"2026-11-01T12:31:16"}
-```
-
-### `POST /approval`
-
-```json
-{ "thread_id": "demo-001", "user_id": "u_1002", "decision": "yes" }
-```
-
-`decision` 只接受 `"yes"` / `"no"`，直接作为 `Command(resume=...)` 的值。线程当前没有待处理的中断时返回 **409**，前端据此提示"审批已失效"。
-
-```bash
-curl -N -X POST http://127.0.0.1:8123/chat \
-  -H "Content-Type: application/json" \
-  -d '{"message":"帮我买入 110020 一千元","thread_id":"demo-001","user_id":"u_1002"}'
-
-curl -N -X POST http://127.0.0.1:8123/approval \
-  -H "Content-Type: application/json" \
-  -d '{"thread_id":"demo-001","user_id":"u_1002","decision":"yes"}'
-```
-
-`thread_id` 决定会话与票据归属，跨请求、跨天恢复都靠它。反向代理（nginx）必须关掉响应缓冲并放大超时，否则 SSE 会被攒成一整块：
-
-```nginx
-proxy_buffering off;
-proxy_read_timeout 300s;
-proxy_set_header X-Accel-Buffering no;
-```
-
----
-
-## 测试
-
-工作流与检索测试直接跑（需要先完成第 4、5 步：业务库与向量库就绪）：
-
-```bash
-# 七条主链路：直答 / 直查 / 委派投研 / 委派行情 / 合规拦截 / 全链路审批 / 幂等重放
-# 注：审批那条用例仍按旧版静态断点（ainvoke(None)）写法，迁移到 interrupt() 后需同步改成 Command(resume=...)
-python -m test.test_fin_workflow
-
-# 检索效果
-python -m test.test_search
-```
-
-接口测试需要服务已启动（`python -m test.run_server`）：
-
-```bash
-# 审批事件：跑到中断即停，校验卡片字段与"交易工具确实没执行"
-python -m test.test_approval_sse
-
-# 审批恢复接口契约：批准 / 拒绝 / 重复提交 409 / 无待审批 409
-python -m test.test_approval_resume
-```
-
-测试都开独立 `thread_id`，互不污染。审计口径可直接查库核对：
-
-```sql
-SELECT status, count(*) FROM compliance_ticket GROUP BY status;   -- issued / consumed / revoked
-SELECT result, count(*) FROM audit_log GROUP BY result;           -- filled / rejected / cancelled
-```
 
 ---
 
