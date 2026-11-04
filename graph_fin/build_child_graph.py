@@ -4,11 +4,12 @@
 这种失控的路由。
 """
 from langchain_core.messages import ToolMessage
+from langchain_core.tools import BaseTool
 from langgraph.graph import StateGraph,END
 from langgraph.types import interrupt, Command
 
-from graph_fin.agent_assistant import research_runnable, market_runnable, trade_runnable, trade_safe_tools, \
-    trade_sensitive_tools
+from graph_fin.agent_assistant import research_runnable, trade_runnable, trade_safe_tools, \
+    trade_sensitive_tools, get_market_runnable
 from graph_fin.assistant import FinAssistant
 from graph_fin.compliance import compliance_node, route_after_compliance
 from graph_fin.entry_node import create_entry_node
@@ -51,12 +52,12 @@ def build_research_graph(builder: StateGraph) -> StateGraph:
     builder.add_edge("leave_skill", "primary_assistant")
     return builder
 # ------------------------------------------------------------------ 行情子图
-def build_market_graph(builder: StateGraph) -> StateGraph:
+def build_market_graph(builder: StateGraph,mcptool:list[BaseTool]) -> StateGraph:
     """行情助理子图：行情 / 持仓 / 账户，全部只读，不打断用户。"""
     builder.add_node("enter_market", create_entry_node("行情助理", "market"))
-    builder.add_node("market", FinAssistant(market_runnable))
+    builder.add_node("market", FinAssistant(get_market_runnable(mcptool)))
     builder.add_edge("enter_market", "market")
-    builder.add_node("market_tools", create_tool_node_with_fallback(MARKET_SAFE_TOOLS))
+    builder.add_node("market_tools", create_tool_node_with_fallback(MARKET_SAFE_TOOLS+mcptool))
     builder.add_edge("market_tools", "market")
     builder.add_conditional_edges("market", route_market,
                                   ["market_tools", "leave_skill", END])

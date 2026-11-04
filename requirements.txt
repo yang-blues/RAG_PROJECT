@@ -141,3 +141,6 @@ wrapt==1.17.2
 xxhash==3.5.0
 yarl==1.19.0
 zstandard==0.23.0
+langchain-mcp-adapters==0.1.9
+mcp==1.27.2
+uvicorn==0.54.0

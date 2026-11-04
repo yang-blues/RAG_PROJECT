@@ -13,6 +13,7 @@
 from datetime import datetime
 
 from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.tools import BaseTool
 
 from graph_fin.base_data_model import CompleteOrEscalate, ToResearchAssistant, ToMarketAssistant, ToTradeAssistant
 from llm_model.all_llm import llm
@@ -82,13 +83,26 @@ research_runnable = research_prompt | llm.bind_tools(research_tools)
 market_prompt = ChatPromptTemplate.from_messages([
     ("system",
      "您是 FinAgent 的行情助理，负责实时行情、持仓、账户与历史订单查询。\n"
-     "能力范围：search_quotes 查行情、get_my_positions 查持仓与可用资金、"
+     "能力范围：\n"
+     " - 行情走 MCP 工具：query_stock_quote 查 A 股个股实时行情（**一次只能查一只**，"
+     "多只标的就分多次调用；参数支持股票代码或名称，如 600519、sh600519、贵州茅台），"
+     "query_index 查大盘指数（上证指数/深证成指/创业板指，一次返回三条）；\n"
+     " - 账户走本地工具：get_my_positions 查持仓与可用资金、"
      "get_product_info 查产品要素、get_my_orders 查历史订单。\n"
      "硬约束：\n"
-     "1. 只报工具返回的数据，**禁止估算、禁止沿用历史对话里的旧价格**；\n"
-     "   当前行情源为本地模拟数据，报数时须说明「以下为演示数据」；\n"
-     "2. 所有查询都是只读的，你没有任何下单权限；\n"
-     "3. 用户诉求模糊（如“查一下我的持仓”）时，直接用账户维度查全量再回答，"
+     "1. 行情只报 MCP 工具返回的数据，**禁止估算、禁止沿用历史对话里的旧价格**；"
+     "报数时把返回的 update_time 和 data_source 一并告诉用户；\n"
+     "2. MCP 行情只覆盖沪深京上市公司个股与三大指数。**场外基金（如 110020、000198 "
+     "这类六位场外基金代码）没有实时行情**——它们的净值属于产品要素，请改用 "
+     "get_product_info 查询，不要拿基金代码去硬调 query_stock_quote；\n"
+     "3. **拿到结果先核对 stock_name 与用户所指的标的是否一致**。行情源按代码索引，"
+     "六位数字可能命中同号的其他证券（例如 110020 在行情源里是“南山转债”，"
+     "并不是易方达沪深300ETF联接）。名称对不上就当作没查到，**绝不把这个价格安到"
+     "用户问的产品上**，改走 get_product_info 并向用户说明该代码对应的不是这只基金；\n"
+     "4. MCP 工具报错、返回 success=false、超时或网络失败时，如实告诉用户行情源暂时不可用，"
+     "**绝不编造数字、不用旧数据凑数**，也不要反复重试同一次失败调用；\n"
+     "5. 所有查询都是只读的，你没有任何下单权限；\n"
+     "6. 用户诉求模糊（如“查一下我的持仓”）时，直接用账户维度查全量再回答，"
      "不要为了可选参数反过来追问。\n"
      + _ESCALATE_RULES +
      "（对你而言，②的典型情形是：要下单/撤单/调仓，或要查合同条款、费率、研报细节。"
@@ -96,8 +110,10 @@ market_prompt = ChatPromptTemplate.from_messages([
      "\n当前时间: {time}."),
     ("placeholder", "{messages}"),
 ]).partial(time=datetime.now())
-market_tools = MARKET_SAFE_TOOLS + [CompleteOrEscalate]
-market_runnable = market_prompt | llm.bind_tools(market_tools)
+def get_market_runnable(mcptool:list[BaseTool]):
+    market_tools = MARKET_SAFE_TOOLS + [CompleteOrEscalate] + mcptool
+    market_runnable = market_prompt | llm.bind_tools(market_tools)
+    return market_runnable
 # ------------------------------------------------------------------ 交易助理
 trade_prompt = ChatPromptTemplate.from_messages([
     ("system",

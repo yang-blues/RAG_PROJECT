@@ -12,17 +12,20 @@ from tools.tools_handler import create_tool_node_with_fallback
 #需要人工审批的节点，只有它会产生真实的副作用
 INTERRUPT_BEFORE = ["trade_sensitive_tools"]
 
-def build_graph() -> StateGraph:
+def build_graph(**kwargs) -> StateGraph:
     """组装主图（未编译）。
 
     返回:
         StateGraph: 组装好的图对象。
     """
+    #行情搜索的mcp工具
+    stock_tools = kwargs.get("stock_tools", [])
+
     builder = StateGraph(State)
     builder.add_node("fetch_user_profile",get_user_profile)
     builder.add_edge(START,"fetch_user_profile")
     builder = build_research_graph(builder)
-    builder = build_market_graph(builder)
+    builder = build_market_graph(builder,stock_tools)
     builder = build_trade_graph(builder)
 
     builder.add_node("primary_assistant", FinAssistant(primary_runnable))

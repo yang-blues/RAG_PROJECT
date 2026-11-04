@@ -26,7 +26,7 @@ from untils.log_utils import log
 # 敏感工具名：路由用它判断"这条 tool_call 会不会产生副作用"
 SENSITIVE_TOOL_NAMES = ("place_order", "cancel_order", "rebalance")
 # 安全工具名：只读查询，不打断用户
-SAFE_TOOL_NAMES = ("search_quotes", "get_my_positions", "get_product_info",
+SAFE_TOOL_NAMES = ("get_my_positions", "get_product_info",
                    "get_my_orders")
 
 
@@ -63,38 +63,6 @@ def _to_float(x) -> float:
 
 
 # ------------------------------------------------------------------ safe 工具
-@tool
-def search_quotes(symbols: str) -> str:
-    """查询一个或多个标的的最新行情（价格、涨跌幅、昨收）。
-
-    参数 symbols 为标的代码，多个用逗号分隔，例如 '510300,000198'。
-    这是只读查询，不会改变任何账户状态。
-
-    **报价纪律**：当前行情源是本地确定性模拟值（``source: mock``），
-    不是真实市场数据，报数时需说明这是演示数据；
-    禁止估算、禁止沿用历史对话里的旧价格。
-    """
-    codes = [s.strip() for s in symbols.split(",") if s.strip()]
-    if not codes:
-        return "未提供标的代码。"
-    rows = []
-    for code in codes[:10]:     # 一次最多 10 个，防模型塞一整个列表进来
-        # 确定性模拟行情：同一代码每次返回同一价，便于回归测试。
-        # 接真实行情时把这里换成 akshare / 券商行情 API 即可，工具签名不变。
-        seed = zlib.crc32(code.encode())
-        nav = 1.0 + (seed % 8000) / 1000.0
-        change = ((seed >> 8) % 400 - 200) / 100.0     # -2.00% ~ +2.00%
-        prev = nav / (1 + change / 100)
-        rows.append({
-            "symbol": code,
-            "price": round(nav, 4),
-            "change_pct": round(change, 2),
-            "prev_close": round(prev, 4),
-            "updated_at": datetime.now().strftime("%H:%M:%S"),
-        })
-    return json.dumps({"quotes": rows, "source": "mock"}, ensure_ascii=False)
-
-
 @tool
 def get_product_info(product_code: str = "") -> str:
     """查询在售产品的要素：名称、风险等级 R1~R5、最新净值、起购金额。
@@ -268,7 +236,7 @@ def rebalance(targets: str,
 
 # ------------------------------------------------------------------ 工具分组
 # 行情助理：四件套齐全，查行情是它的本职
-MARKET_SAFE_TOOLS = [search_quotes, get_product_info, get_my_positions, get_my_orders]
+MARKET_SAFE_TOOLS = [get_product_info, get_my_positions, get_my_orders]
 # 交易助理：只保留"下单前自查"用的三件——产品要素、可用资金、历史订单，
 # 让模型先查再写，而不是拿对话里的旧数字或猜的值去填下单参数。
 # **刻意不含 search_quotes**：一旦给了行情工具，"用户问行情 → 交还主助理"这条
